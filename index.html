@@ -46,7 +46,7 @@
     </div>
 
     <script>
-        // Betöltjük a tokent a böngésző memóriájából, ha már elmentettük korábban
+        // Automatikusan betöltjük a tokent a memóriából, ha már elmentettük
         const savedToken = localStorage.getItem('hf_token_saved');
         if (savedToken) {
             document.getElementById('hfTokenInput').value = savedToken;
@@ -63,39 +63,42 @@
             
             if (!fileInput.files[0] || !txtInput.files[0] || !tokenInput) return;
             
-            // Elmentjük a böngészőbe, hogy legközelebb ne kelljen beírni
+            // Elmentjük a böngészőbe a tokent
             localStorage.setItem('hf_token_saved', tokenInput);
             
             loadingText.style.display = 'block';
             resultBox.style.display = 'none';
+            loadingText.textContent = "Kapcsolódás az AI-hoz (ha elsőre futtatod, ez eltarthat fél percig, amíg a szerver felébred)...";
             
             try {
-                // 1. TXT beolvasása
-                const promptText = await new Promise((resolve) => {
+                // 1. TXT beolvasása (A te egyedi promptod)
+                const promptText = await new Promise((resolve, reject) => {
                     const txtReader = new FileReader();
                     txtReader.onload = (e) => resolve(e.target.result);
+                    txtReader.onerror = () => reject(new Error("Nem sikerült a TXT olvasása"));
                     txtReader.readAsText(txtInput.files[0]);
                 });
 
                 // 2. Kép beolvasása tiszta Base64 formátumban
-                const base64Image = await new Promise((resolve) => {
+                const base64Image = await new Promise((resolve, reject) => {
                     const imgReader = new FileReader();
                     imgReader.onload = (e) => {
                         const pureBase64 = e.target.result.split(',')[1];
                         resolve(pureBase64);
                     };
+                    imgReader.onerror = () => reject(new Error("Nem sikerült a kép olvasása"));
                     imgReader.readAsDataURL(fileInput.files[0]);
                 });
 
-                // 3. API hívás a beírt tokennel és az üzembiztos BLIP modellel
-                const response = await fetch('https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large', {
+                // 3. API hívás a Google Gemma-2 Látó-modellnek a megfelelő szöveges formátumban
+                const response = await fetch('https://api-inference.huggingface.co/models/google/gemma-2-27b-it', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${tokenInput}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        inputs: base64Image
+                        inputs: `[Image: data:image/png;base64,${base64Image}] \n\n Utasítás: ${promptText}`
                     })
                 });
 
@@ -105,16 +108,29 @@
                 resultBox.style.display = 'block';
 
                 if (data.error) {
-                    resultBox.innerHTML = `<span style="color:red;">Hiba történt: ${data.error}</span>`;
+                    // Ha a modell éppen most ébred (loading állapotban van), ezt kiírjuk szépen
+                    if (data.error.includes("loading")) {
+                        resultBox.innerHTML = `<span style="color:orange;">Az AI szervere éppen most ébred fel a készenléti állapotból. Kérlek várj 20 másodpercet, és nyomj újra a Generate gombra!</span>`;
+                    } else {
+                        resultBox.innerHTML = `<span style="color:red;">Hiba az AI szerverétől: ${data.error}</span>`;
+                    }
                 } else {
-                    const aiText = data[0]?.generated_text || JSON.stringify(data);
+                    // Sikeres válasz kiírása
+                    let aiText = "";
+                    if (Array.isArray(data) && data[0]?.generated_text) {
+                        aiText = data[0].generated_text;
+                    } else if (data.generated_text) {
+                        aiText = data.generated_text;
+                    } else {
+                        aiText = JSON.stringify(data);
+                    }
                     resultBox.textContent = aiText;
                 }
                 
             } catch (error) {
                 loadingText.style.display = 'none';
                 resultBox.style.display = 'block';
-                resultBox.innerHTML = `<span style="color:red;">Hiba a folyamat során: ${error.message}</span>`;
+                resultBox.innerHTML = `<span style="color:red;">Hiba történt: ${error.message}. Tipp: Ellenőrizd, hogy az új HF tokenedet másoltad-e be!</span>`;
             }
         });
     </script>
