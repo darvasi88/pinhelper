@@ -54,22 +54,22 @@
 
         document.getElementById('pinterestForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const tokenInput = document.getElementById('hfTokenInput').value.trim();
             const fileInput = document.getElementById('imageInput');
             const txtInput = document.getElementById('txtInput');
             const loadingText = document.getElementById('loadingText');
             const resultBox = document.getElementById('resultBox');
-            
+
             if (!fileInput.files[0] || !txtInput.files[0] || !tokenInput) return;
-            
+
             // Elmentjük a böngészőbe a tokent
             localStorage.setItem('hf_token_saved', tokenInput);
-            
+
             loadingText.style.display = 'block';
             resultBox.style.display = 'none';
             loadingText.textContent = "Kapcsolódás az AI-hoz (ha elsőre futtatod, ez eltarthat fél percig, amíg a szerver felébred)...";
-            
+
             try {
                 // 1. TXT beolvasása (A te egyedi promptod)
                 const promptText = await new Promise((resolve, reject) => {
@@ -90,8 +90,8 @@
                     imgReader.readAsDataURL(fileInput.files[0]);
                 });
 
-                // 3. API hívás a Google Gemma-2 Látó-modellnek a megfelelő szöveges formátumban
-                const response = await fetch('https://api-inference.huggingface.co/models/google/gemma-2-27b-it', {
+                // 3. API hívás - JAVÍTOTT, PONTOS URL (94. SOR) ÉS SZABVÁNYOS JAVASCRIPT FETCH
+                const response = await fetch("https://api-inference.huggingface.co/models/google/gemma-2-27b-it", {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${tokenInput}`,
@@ -103,16 +103,15 @@
                 });
 
                 const data = await response.json();
-                
+
                 loadingText.style.display = 'none';
                 resultBox.style.display = 'block';
 
                 if (data.error) {
-                    // Ha a modell éppen most ébred (loading állapotban van), ezt kiírjuk szépen
-                    if (data.error.includes("loading")) {
+                    if (typeof data.error === 'string' && data.error.includes("loading")) {
                         resultBox.innerHTML = `<span style="color:orange;">Az AI szervere éppen most ébred fel a készenléti állapotból. Kérlek várj 20 másodpercet, és nyomj újra a Generate gombra!</span>`;
                     } else {
-                        resultBox.innerHTML = `<span style="color:red;">Hiba az AI szerverétől: ${data.error}</span>`;
+                        resultBox.innerHTML = `<span style="color:red;">Hiba az AI szerverétől: ${data.error.message || JSON.stringify(data.error)}</span>`;
                     }
                 } else {
                     // Sikeres válasz kiírása
@@ -126,11 +125,11 @@
                     }
                     resultBox.textContent = aiText;
                 }
-                
+
             } catch (error) {
                 loadingText.style.display = 'none';
                 resultBox.style.display = 'block';
-                resultBox.innerHTML = `<span style="color:red;">Hiba történt: ${error.message}. Tipp: Ellenőrizd, hogy az új HF tokenedet másoltad-e be!</span>`;
+                resultBox.innerHTML = `<span style="color:red;">Hiba történt: ${error.message}. Tipp: Győződj meg róla, hogy az éles linket nyitottad meg!</span>`;
             }
         });
     </script>
