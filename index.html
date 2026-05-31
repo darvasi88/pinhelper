@@ -73,7 +73,7 @@
                 console.log("Küldés az AI-nak a megadott prompttal...");
 
                 // 3. MEGHÍVJUK A MODELLT
-                const response = await fetch('https://api-inference.huggingface.co/models/xtuner/llava-llama-3-8b-v1_1-int4', {
+                const response = await fetch('https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${HF_TOKEN}`,
